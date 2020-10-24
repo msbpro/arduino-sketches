@@ -1,35 +1,96 @@
+//#define ENABLE_WIFI
 #include "DHT.h"
-#include <LiquidCrystal.h>
+#include <hd44780.h>
+#include <hd44780ioClass/hd44780_pinIO.h>
+#ifdef ENABLE_WIFI
+  #include <SPI.h>
+  #include <WiFiNINA.h>
+  int status = WL_IDLE_STATUS;// the Wifi radio's status
+#endif
+#include "secrets.h" 
+
 #define DHTPIN 7
 #define DHTTYPE DHT11   // DHT 11
 #define NONDHTSENORPIN A0
 
 DHT dht(DHTPIN, DHTTYPE);
-LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+hd44780_pinIO lcd(12, 11, 5, 4, 3, 2);
 bool hasCleared = false;
 bool shouldLog = false;
 
-unsigned long prevMillis = 0;
+unsigned long prevMillisCalcValues = 0;
+unsigned long prevMillisWifi = 0;
 long calcValuesInterval = 1000;
+long wifiInterval = 1000;
 
 String inputString = "";
 bool stringComplete = false;
+bool forceUpdate = false;
+
+char ssid[] = SECRET_SSID;
+char pass[] = SECRET_PASS;
 
 void setup() {
   Serial.begin(9600);
+
+  while (!Serial) 
+  {
+    ; // wait for serial port to connect. Needed for native USB port only
+  }
+  
   lcd.begin(16, 2);
   lcd.print("Initializing...");
   dht.begin();
   inputString.reserve(200);
+
+  #ifdef WIFI
+  if (WiFi.status() == WL_NO_MODULE) 
+  {
+    Serial.println("Communication with WiFi module failed!");
+  }
+  else 
+  {
+    lcd.setCursor(0,1);
+    lcd.print("Wifi: init");
+    wifiEnabled = true;
+    String fv = WiFi.firmwareVersion();
+    if (fv < WIFI_FIRMWARE_LATEST_VERSION) {
+      Serial.println("Please upgrade the firmware");
+    }
+  
+    // attempt to connect to Wifi network:
+    while (status != WL_CONNECTED) {
+      Serial.print("Attempting to connect to WPA SSID: ");
+      Serial.println(ssid);
+      // Connect to WPA/WPA2 network:
+      status = WiFi.begin(ssid, pass);
+  
+      // wait for connection:
+      delay(5000);
+    }
+  
+    // you're connected now, so print out the data:
+    Serial.print("You're connected to the network");
+    printCurrentNet();
+    printWifiData();
+  }
+  #endif
+  
 }
 
 void loop() {
+  if (Serial.available() > 0) 
+  {
+    checkSerial();
+  }
+   
   checkCLI();
   
   unsigned long curMillis = millis();
-  if(curMillis - prevMillis >= calcValuesInterval)
+  if((curMillis - prevMillisCalcValues >= calcValuesInterval) || forceUpdate)
   {
-    prevMillis = curMillis;
+    forceUpdate = false;
+    prevMillisCalcValues = curMillis;
     int sensorVal = analogRead(NONDHTSENORPIN);
 
     // convert the ADC reading to voltage
@@ -54,10 +115,16 @@ void loop() {
     float avgTemp = (tempF + tempF + tempF2)/3;
     updateLcd(avgTemp, humidity);  
   }
-  
+#ifdef ENABLE_WIFI
+  if((curMillis - prevMillisWifi >= wifiInterval))
+  {
+    prevMillisWifi = curMillis;
+    printCurrentNet();
+  }
+#endif
 }
 
-void serialEvent()
+void checkSerial()
 {
   while(Serial.available())
   {
@@ -88,7 +155,7 @@ void checkCLI()
     }
     else if(inputString.equalsIgnoreCase("update"))
     {
-      prevMillis = 0;
+      forceUpdate = true;
     }
     else if(inputString.startsWith("interval"))
     {
@@ -113,9 +180,15 @@ void checkCLI()
       lcd.clear();
       lcd.setCursor(0,0);
     }
+    #ifdef ENABLE_WIFI
+    else if(inputString.equalsIgnoreCase("net"))
+    {
+      printCurrentNet();
+    }
+    #endif
     else
     {
-      Serial.println("supported commands debug, update, interval, lcd-write, lcd-clear");
+      Serial.println("supported commands debug, update, interval, lcd-write, lcd-clear, net");
     }
     inputString = "";
     stringComplete = false;
@@ -170,3 +243,50 @@ void updateLcd(float avgTemp, float humidity)
   lcd.print(humidity, 0);
   lcd.print("%");
 }
+
+#ifdef ENABLE_WIFI
+void printWifiData() 
+{
+  IPAddress ip = WiFi.localIP();
+  Serial.print("IP Address: ");
+  Serial.println(ip);
+  Serial.println(ip);
+
+  byte mac[6];
+  WiFi.macAddress(mac);
+  Serial.print("MAC address: ");
+  printMacAddress(mac);
+}
+
+void printCurrentNet() {
+  Serial.print("SSID: ");
+  Serial.println(WiFi.SSID());
+
+  byte bssid[6];
+  WiFi.BSSID(bssid);
+  Serial.print("BSSID: ");
+  printMacAddress(bssid);
+
+  long rssi = WiFi.RSSI();
+  Serial.print("signal strength (RSSI):");
+  Serial.println(rssi);
+
+  byte encryption = WiFi.encryptionType();
+  Serial.print("Encryption Type:");
+  Serial.println(encryption, HEX);
+  Serial.println();
+}
+
+void printMacAddress(byte mac[]) {
+  for (int i = 5; i >= 0; i--) {
+    if (mac[i] < 16) {
+      Serial.print("0");
+    }
+    Serial.print(mac[i], HEX);
+    if (i > 0) {
+      Serial.print(":");
+    }
+  }
+  Serial.println();
+}
+#endif
