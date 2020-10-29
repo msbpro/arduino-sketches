@@ -31,7 +31,7 @@ void setup() {
   
   lcd.begin(16, 2);
   lcd.clear();
-  lcd.print("Initializing...");
+  lcd.print(F("Initializing..."));
   dht.begin();
   inputString.reserve(200);
 
@@ -74,7 +74,16 @@ void loop() {
   
     logValues(sensorVal, voltage, tempC, tempF, humidity, tempC2, tempF2);
     float avgTemp = (tempF + tempF + tempF2)/3;
-    updateLcd(avgTemp, humidity);  
+    updateLcd(avgTemp, humidity);
+    char avgTempStr[10];
+    dtostrf(avgTemp, 5, 1, avgTempStr);
+    
+    char humidityStr[10];
+    dtostrf(humidity, 5, 1, humidityStr);
+    
+    char temp[200];
+    snprintf_P(temp, sizeof(temp), PSTR("<html><head><title>Temp + Humidity</title></head><body><div>Temperature: %s <span>&#176;</span>F<br>Humidity: %s%%</div></body></html>"), avgTempStr, humidityStr);
+    wifi.setServerOutput(temp);
   }
 
   wifi.loop();
@@ -105,16 +114,16 @@ void checkCLI()
     {
       Serial.println(inputString);
     }
-    if(inputString.equalsIgnoreCase("debug"))
+    if(inputString.equalsIgnoreCase(F("debug")))
     {
       shouldLog = !shouldLog;
       wifi.updateDebug(shouldLog);
     }
-    else if(inputString.equalsIgnoreCase("update"))
+    else if(inputString.equalsIgnoreCase(F("update")))
     {
       forceUpdate = true;
     }
-    else if(inputString.startsWith("interval"))
+    else if(inputString.startsWith(F("interval")))
     {
       String interval = inputString.substring(8);
       interval.trim();
@@ -124,7 +133,7 @@ void checkCLI()
         calcValuesInterval = intInterval;
       }
     }
-    else if(inputString.startsWith("lcd-write"))
+    else if(inputString.startsWith(F("lcd-write")))
     {
       String outStr = inputString.substring(9);
       outStr.trim();
@@ -132,20 +141,21 @@ void checkCLI()
       lcd.setCursor(0,0);
       lcd.print(outStr);
     }
-    else if(inputString.equalsIgnoreCase("lcd-clear"))
+    else if(inputString.equalsIgnoreCase(F("lcd-clear")))
     {
       lcd.clear();
       lcd.setCursor(0,0);
     }
     #ifdef ENABLE_WIFI
-    else if(inputString.equalsIgnoreCase("net"))
+    else if(inputString.equalsIgnoreCase(F("net")))
     {
       wifi.printCurrentNet();
+      wifi.printWifiData();
     }
     #endif
     else
     {
-      Serial.println("supported commands debug, update, interval, lcd-write, lcd-clear, net");
+      Serial.println(F("supported commands debug, update, interval, lcd-write, lcd-clear, net"));
     }
     inputString = "";
     stringComplete = false;
@@ -158,13 +168,13 @@ void logValues(int sensorVal, float voltage, float tempC, float tempF, float hum
   {
     return;
   }
-  Serial.print("sensor Value: ");
+  Serial.print(F("sensor Value: "));
   Serial.print(sensorVal);
-  Serial.print(", Volts: ");
+  Serial.print(F(", Volts: "));
   Serial.print(voltage);
-  Serial.print(", degrees C: ");
+  Serial.print(F(", degrees C: "));
   Serial.print(tempC);
-  Serial.print(", degrees F: ");
+  Serial.print(F(", degrees F: "));
   Serial.println(tempF);
   if (isnan(humidity) || isnan(tempC2) || isnan(tempF2)) 
   {
@@ -172,13 +182,13 @@ void logValues(int sensorVal, float voltage, float tempC, float tempF, float hum
   }
   else
   {
-    Serial.print("dht11: ");
+    Serial.print(F("dht11: "));
     Serial.print(tempC2);
-    Serial.print(" C / ");
+    Serial.print(F(" C / "));
     Serial.print(tempF2);
-    Serial.print("F / ");
+    Serial.print(F("F / "));
     Serial.print(humidity, 0);
-    Serial.println("%");
+    Serial.println(F("%"));
   }
 }
 
@@ -191,12 +201,12 @@ void updateLcd(float avgTemp, float humidity)
   }
 
   lcd.setCursor(0, 0);
-  lcd.print("Temp:");
+  lcd.print(F("Temp:"));
   lcd.print(avgTemp, 1);
   lcd.print((char)223);
-  lcd.print("F");
+  lcd.print(F("F"));
   lcd.setCursor(0, 1);
-  lcd.print("Humidity:");
+  lcd.print(F("Humidity:"));
   lcd.print(humidity, 0);
-  lcd.print("%");
+  lcd.print(F("%"));
 }

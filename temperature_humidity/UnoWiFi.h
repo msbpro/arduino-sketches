@@ -24,12 +24,14 @@ class UnoWiFi
     setup(),
     loop(),
     updateDebug(bool debug),
-    printCurrentNet();
+    printCurrentNet(),
+    printWifiData(),
+    setServerOutput(char* output);
 
-   protected:
+   private:
     void 
-      printWifiData(),
-      printMacAddress(byte mac[]);
+      printMacAddress(byte mac[]),
+      checkClient();
 };
 
 #endif
