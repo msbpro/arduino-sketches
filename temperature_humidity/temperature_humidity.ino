@@ -4,8 +4,6 @@
 #include <hd44780.h>
 #include <hd44780ioClass/hd44780_pinIO.h>
 
-//#include "UnoWiFi.h"
-//UnoWiFi wifi(true);
 #include "secrets.h"
 #define USE_AIRLIFT     // required for Arduino Uno WiFi R2 board compatability
 #include "AdafruitIO_WiFi.h"
@@ -63,10 +61,7 @@ void setup() {
  
   // we are connected
   Serial.println();
-  Serial.println(io.statusText());
-
-  //wifi.setup();
-  
+  Serial.println(io.statusText());  
 }
 
 void loop() {
@@ -120,21 +115,7 @@ void loop() {
       humidityFeed->save(humidity, 0, 0, 0, 2);
       wifiFeed->save(wifiStrength, 0, 0, 0);
     }
-    
-    /*
-    char avgTempStr[10];
-    dtostrf(avgTemp, 5, 1, avgTempStr);
-    
-    char humidityStr[10];
-    dtostrf(humidity, 5, 1, humidityStr);
-
-    char temp[200];
-    snprintf_P(temp, sizeof(temp), PSTR("<html><head><title>Temp + Humidity</title></head><body><div>Temperature: %s <span>&#176;</span>F<br>Humidity: %s%%</div></body></html>"), avgTempStr, humidityStr);
-    wifi.setServerOutput(temp);
-    */
   }
-
-  //wifi.loop();
 }
 
 void checkSerial()
@@ -165,7 +146,6 @@ void checkCLI()
     if(inputString.equalsIgnoreCase(F("debug")))
     {
       shouldLog = !shouldLog;
-      //wifi.updateDebug(shouldLog);
     }
     else if(inputString.equalsIgnoreCase(F("update")))
     {
@@ -194,18 +174,9 @@ void checkCLI()
       lcd.clear();
       lcd.setCursor(0,0);
     }
-    /*
-    #ifdef ENABLE_WIFI
-    else if(inputString.equalsIgnoreCase(F("net")))
-    {
-      wifi.printCurrentNet();
-      wifi.printWifiData();
-    }
-    #endif
-    */
     else
     {
-      Serial.println(F("supported commands debug, update, interval, lcd-write, lcd-clear, net"));
+      Serial.println(F("supported commands debug, update, interval, lcd-write, lcd-clear"));
     }
     inputString = "";
     stringComplete = false;
