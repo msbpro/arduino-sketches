@@ -1,4 +1,6 @@
-#include "DHT.h"
+// for uno wifi we need the old library
+#include "DHT_old.h"
+//#include "DHT.h"
 #include <hd44780.h>
 #include <hd44780ioClass/hd44780_pinIO.h>
 
@@ -23,7 +25,6 @@ bool forceUpdate = false;
 
 void setup() {
   Serial.begin(9600);
-
   while (!Serial) 
   {
     ; // wait for serial port to connect. Needed for native USB port only
