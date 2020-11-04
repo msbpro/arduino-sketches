@@ -4,8 +4,19 @@
 #include <hd44780.h>
 #include <hd44780ioClass/hd44780_pinIO.h>
 
-#include "UnoWiFi.h"
-UnoWiFi wifi(true);
+//#include "UnoWiFi.h"
+//UnoWiFi wifi(true);
+#include "secrets.h"
+#define USE_AIRLIFT     // required for Arduino Uno WiFi R2 board compatability
+#include "AdafruitIO_WiFi.h"
+AdafruitIO_WiFi io(IO_USERNAME, IO_KEY, SECRET_SSID, SECRET_PASS, SPIWIFI_SS, SPIWIFI_ACK, SPIWIFI_RESET, NINA_GPIO0, &SPI);
+
+// set up the 'temperature' feed
+AdafruitIO_Feed *tempFeed = io.feed("room.temperature");
+// set up the 'humidity' feed
+AdafruitIO_Feed *humidityFeed = io.feed("room.humidity");
+// set up the 'wifi-strength' feed
+AdafruitIO_Feed *wifiFeed = io.feed("room.wifi-strength");
 
 #define DHTPIN 7
 #define DHTTYPE DHT11   // DHT 11
@@ -19,9 +30,12 @@ bool shouldLog = false;
 unsigned long prevMillisCalcValues = 0;
 long calcValuesInterval = 1000;
 
+long wifiSendInterval = 30000;
+unsigned long prevMillisWifiSend = wifiSendInterval * 2;
+
 String inputString = "";
 bool stringComplete = false;
-bool forceUpdate = false;
+bool forceUpdate = true;
 
 void setup() {
   Serial.begin(9600);
@@ -36,11 +50,28 @@ void setup() {
   dht.begin();
   inputString.reserve(200);
 
-  wifi.setup();
+  // connect to io.adafruit.com
+  Serial.print(F("Connecting to Adafruit IO"));
+  io.connect();
+ 
+  // wait for a connection
+  while (io.status() < AIO_CONNECTED)
+  {
+    Serial.print(".");
+    delay(500);
+  }
+ 
+  // we are connected
+  Serial.println();
+  Serial.println(io.statusText());
+
+  //wifi.setup();
   
 }
 
 void loop() {
+  io.run();
+  
   if (Serial.available() > 0) 
   {
     checkSerial();
@@ -72,22 +103,38 @@ void loop() {
     float tempC2 = dht.readTemperature();
     // Read temperature as Fahrenheit
     float tempF2 = dht.readTemperature(true);
-  
-    logValues(sensorVal, voltage, tempC, tempF, humidity, tempC2, tempF2);
+    long wifiStrength = WiFi.RSSI();
+    
+    logValues(sensorVal, voltage, tempC, tempF, humidity, tempC2, tempF2, wifiStrength);
     float avgTemp = (tempF + tempF + tempF2)/3;
     updateLcd(avgTemp, humidity);
+
+    if(curMillis - prevMillisWifiSend >= wifiSendInterval)
+    {
+      prevMillisWifiSend = curMillis;
+      if(shouldLog)
+      {
+        Serial.println(F("sending data over wifi"));
+      }
+      tempFeed->save(avgTemp, 0, 0, 0, 2);
+      humidityFeed->save(humidity, 0, 0, 0, 2);
+      wifiFeed->save(wifiStrength, 0, 0, 0);
+    }
+    
+    /*
     char avgTempStr[10];
     dtostrf(avgTemp, 5, 1, avgTempStr);
     
     char humidityStr[10];
     dtostrf(humidity, 5, 1, humidityStr);
-    
+
     char temp[200];
     snprintf_P(temp, sizeof(temp), PSTR("<html><head><title>Temp + Humidity</title></head><body><div>Temperature: %s <span>&#176;</span>F<br>Humidity: %s%%</div></body></html>"), avgTempStr, humidityStr);
     wifi.setServerOutput(temp);
+    */
   }
 
-  wifi.loop();
+  //wifi.loop();
 }
 
 void checkSerial()
@@ -118,7 +165,7 @@ void checkCLI()
     if(inputString.equalsIgnoreCase(F("debug")))
     {
       shouldLog = !shouldLog;
-      wifi.updateDebug(shouldLog);
+      //wifi.updateDebug(shouldLog);
     }
     else if(inputString.equalsIgnoreCase(F("update")))
     {
@@ -147,6 +194,7 @@ void checkCLI()
       lcd.clear();
       lcd.setCursor(0,0);
     }
+    /*
     #ifdef ENABLE_WIFI
     else if(inputString.equalsIgnoreCase(F("net")))
     {
@@ -154,6 +202,7 @@ void checkCLI()
       wifi.printWifiData();
     }
     #endif
+    */
     else
     {
       Serial.println(F("supported commands debug, update, interval, lcd-write, lcd-clear, net"));
@@ -163,7 +212,7 @@ void checkCLI()
   }
 }
 
-void logValues(int sensorVal, float voltage, float tempC, float tempF, float humidity, float tempC2, float tempF2)
+void logValues(int sensorVal, float voltage, float tempC, float tempF, float humidity, float tempC2, float tempF2, long wifiStrength)
 {
   if(!shouldLog)
   {
@@ -191,6 +240,8 @@ void logValues(int sensorVal, float voltage, float tempC, float tempF, float hum
     Serial.print(humidity, 0);
     Serial.println(F("%"));
   }
+  Serial.print(F("Wifi strength"));
+  Serial.println(wifiStrength);
 }
 
 void updateLcd(float avgTemp, float humidity)
