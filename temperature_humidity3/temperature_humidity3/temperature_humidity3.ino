@@ -84,7 +84,8 @@ void setup() {
     Serial.println("Failed to set config! \n");
     return;
   }
-  
+
+#ifdef __ENABLE_DEEP_SLEEP__
   if (hasState) {
     //DumpState("setState", sensor_state);
     iaqSensor.setState(sensor_state);
@@ -97,6 +98,7 @@ void setup() {
   } else {
     Serial.println("Saved state missing");
   }
+#endif
  
   iaqSensor.updateSubscription(sensor_list, sizeof(sensor_list), BSEC_SAMPLE_RATE_LP);
   if (!CheckSensor()) {
@@ -133,6 +135,11 @@ void setup() {
 #endif
 
 #ifdef __ENABLE_DEEP_SLEEP__
+  iaqSensor.getState(sensor_state);
+  hasState = true;
+  //DumpState("getState", sensor_state);
+  CheckSensor();
+  
   esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
 
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
@@ -300,7 +307,8 @@ void updateLcd()
   display.print("Temperature: "); display.println((iaqSensor.temperature * 9 / 5) + 32);
   display.print("Pressure: "); display.print(iaqSensor.pressure / 3386.39); display.println(" inHg");
   display.print("Humidity: "); display.print(iaqSensor.humidity); display.println(" %");
-  display.print("IAQ: "); display.print(iaqSensor.staticIaq); display.print(" IAQ Accur: "); display.println(iaqSensor.iaqAccuracy);
+  display.print("IAQ: "); display.println(iaqSensor.staticIaq); 
+  display.print("IAQ Accur: "); display.println(iaqSensor.iaqAccuracy);
   display.print("VOC: "); display.println(iaqSensor.breathVocEquivalent);
   display.print("Wifi strength: ");display.println(WiFi.RSSI());
   display.display();
