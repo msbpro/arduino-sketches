@@ -1,3 +1,4 @@
+// this sketch is for a adafruit huzzah esp32
 #define __INCLUDE__SCREEN__
 #define __ENABLE_DEEP_SLEEP__
 
@@ -198,6 +199,7 @@ void checkTemp()
   iaqFeed->save(iaqSensor.staticIaq, 0, 0, 0, 2);
   vocFeed->save(iaqSensor.breathVocEquivalent, 0, 0, 0, 2);
 
+  logValues();
   updateLcd();
 }
 
@@ -294,6 +296,7 @@ void logValues()
   Serial.print("Pressure = "); Serial.print(iaqSensor.pressure / 3386.39); Serial.println(" inHg");
   Serial.print("Humidity = "); Serial.print(iaqSensor.humidity); Serial.println(" %");
   Serial.print("IAQ = "); Serial.print(iaqSensor.staticIaq); Serial.println("");
+  Serial.print("IAQ Accuracy = "); Serial.println(iaqSensor.iaqAccuracy);
   Serial.print("CO2 equiv = "); Serial.print(iaqSensor.co2Equivalent); Serial.println("");
   Serial.print("Breath VOC = "); Serial.print(iaqSensor.breathVocEquivalent); Serial.println("");
   Serial.print(F("Wifi strength: "));Serial.println(WiFi.RSSI());

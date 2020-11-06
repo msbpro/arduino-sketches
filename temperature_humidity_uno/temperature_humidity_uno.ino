@@ -1,3 +1,4 @@
+//this sketch is for a ardunio uno wifi
 // for uno wifi we need the old library
 #include "DHT_old.h"
 //#include "DHT.h"
