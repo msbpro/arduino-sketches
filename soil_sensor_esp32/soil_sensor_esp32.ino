@@ -1,5 +1,5 @@
 #define __INCLUDE__SCREEN__
-//#define __ENABLE_DEEP_SLEEP__
+#define __ENABLE_DEEP_SLEEP__
 
 #include "secrets.h"
 #include "AdafruitIO_WiFi.h"
@@ -25,14 +25,19 @@ AdafruitIO_Feed *soilFeed = io.feed("plant.soil");
   
 #endif 
 
-#define uS_TO_S_FACTOR 1000000  /* Conversion factor for micro seconds to seconds */
-#define TIME_TO_SLEEP  15        /* Time ESP32 will go to sleep (in seconds) */
+const uint64_t uS_TO_S_FACTOR = 1000000;  /* Conversion factor for micro seconds to seconds */
+const uint64_t TIME_TO_SLEEP = 60 * 60;  /* Time ESP32 will go to sleep (in seconds) */
+const uint64_t SLEEP_TIME = uS_TO_S_FACTOR * TIME_TO_SLEEP;
+
+#define VBATPIN A13
+float measuredvbat;
+const float lowBat = 3.4;
 
 bool shouldLog = true;
 bool forceUpdate = true;
 
 unsigned long prevMillisCalcValues = 0;
-long calcValuesInterval = TIME_TO_SLEEP * 1000;
+uint64_t calcValuesInterval = TIME_TO_SLEEP * 1000;
 
 String inputString = "";
 bool stringComplete = false;
@@ -40,13 +45,15 @@ bool stringComplete = false;
 //RTC_DATA_ATTR int bootCount = 0;
 const int SOIL_SENSOR_PIN = A2;
 
-const int airVal = 2541;
-const int waterVal = 1070;
+const int airVal = 2570;
+const int waterVal = 1050;
 int intervals =(airVal - waterVal) / 3;
 int sensorVal = 0;
+long humidityVal = 0;
 
 void setup() {
   Serial.begin(115200);
+  
   // connect to io.adafruit.com
   Serial.print(F("Connecting to Adafruit IO"));
   io.connect();
@@ -76,7 +83,7 @@ void setup() {
 #endif
 
 #ifdef __ENABLE_DEEP_SLEEP__
-  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+  esp_sleep_enable_timer_wakeup(SLEEP_TIME);
 
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
 
@@ -101,6 +108,17 @@ void commonLoop()
     checkSerial();
   }
   checkCLI();
+
+  //get battery voltage
+  measuredvbat = analogRead(VBATPIN);
+  //convert it from 12 bit ADC
+  measuredvbat /= 4095.0;
+  //measured across a voltage divider in half so times by 2
+  measuredvbat *= 2;
+  //pin reference voltage
+  measuredvbat *= 3.3;
+  //adc reference voltage of esp32 (https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/adc.html#overview)
+  measuredvbat *= 1.1;
 }
 
 void loop() 
@@ -126,7 +144,8 @@ void sleepLoop()
 void checkSensor()
 {
   sensorVal = analogRead(SOIL_SENSOR_PIN);
-  soilFeed->save(sensorVal, 0, 0, 0);
+  humidityVal = map(sensorVal, airVal, waterVal, 0, 100);
+  soilFeed->save(humidityVal, 0, 0, 0);
   logValues();
   updateLcd();
 }
@@ -221,6 +240,7 @@ void logValues()
     return;
   }
   Serial.print("Soil Sensor: "); Serial.println(sensorVal);
+  Serial.print("Humidity %: "); Serial.println(humidityVal);
   if(sensorVal > waterVal && sensorVal < (waterVal + intervals))
   {
     Serial.println("Very Wet");
@@ -237,6 +257,12 @@ void logValues()
   {
     Serial.println("Very Dry");
   }
+  Serial.print(F("Wifi strength: "));Serial.println(WiFi.RSSI());
+  Serial.print("VBat: " ); Serial.println(measuredvbat);
+  if(measuredvbat <= lowBat)
+  {
+    Serial.println("LOW BATTERY!");
+  }
 }
 
 void updateLcd()
@@ -244,6 +270,7 @@ void updateLcd()
 #ifdef __INCLUDE__SCREEN__
   display.clearDisplay();
   display.print("Soil Sensor: "); display.println(sensorVal);
+  display.print("Humidity %: "); display.println(humidityVal);
   if(sensorVal > waterVal && sensorVal < (waterVal + intervals))
   {
     display.println("Very Wet");
@@ -259,6 +286,12 @@ void updateLcd()
   else
   {
     display.println("Very Dry");
+  }
+  display.print("Wifi strength: ");display.println(WiFi.RSSI());
+  display.print("VBat: " ); display.println(measuredvbat);
+  if(measuredvbat <= lowBat)
+  {
+    display.println("LOW BATTERY!");
   }
   display.display();
 #endif
