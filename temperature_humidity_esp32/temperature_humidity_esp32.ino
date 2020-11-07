@@ -23,8 +23,9 @@ AdafruitIO_Feed *vocFeed = io.feed("building.voc");
   Adafruit_SH110X display = Adafruit_SH110X(64, 128, &Wire);
 #endif 
 
-#define uS_TO_S_FACTOR 1000000  /* Conversion factor for micro seconds to seconds */
-#define TIME_TO_SLEEP  60        /* Time ESP32 will go to sleep (in seconds) */
+const uint64_t uS_TO_S_FACTOR = 1000000;  /* Conversion factor for micro seconds to seconds */
+const uint64_t TIME_TO_SLEEP = 60;  /* Time ESP32 will go to sleep (in seconds) */
+const uint64_t SLEEP_TIME = uS_TO_S_FACTOR * TIME_TO_SLEEP;
 
 #include "bsec.h"
 Bsec iaqSensor;
@@ -61,11 +62,14 @@ bsec_virtual_sensor_t sensor_list[10] = {
   BSEC_OUTPUT_SENSOR_HEAT_COMPENSATED_HUMIDITY,
 };
 
+#define VBATPIN A13
+float measuredvbat;
+
 bool shouldLog = true;
 bool forceUpdate = true;
 
 unsigned long prevMillisCalcValues = 0;
-long calcValuesInterval = TIME_TO_SLEEP * 1000;
+uint64_t calcValuesInterval = TIME_TO_SLEEP * 1000;
 
 String inputString = "";
 bool stringComplete = false;
@@ -141,7 +145,7 @@ void setup() {
   //DumpState("getState", sensor_state);
   CheckSensor();
   
-  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+  esp_sleep_enable_timer_wakeup(SLEEP_TIME);
 
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
 
@@ -166,6 +170,17 @@ void commonLoop()
     checkSerial();
   }
   checkCLI();
+
+  //get battery voltage
+  measuredvbat = analogRead(VBATPIN);
+  //convert it from 12 bit ADC
+  measuredvbat /= 4095.0;
+  //measured across a voltage divider in half so times by 2
+  measuredvbat *= 2;
+  //pin reference voltage
+  measuredvbat *= 3.3;
+  //adc reference voltage of esp32 (https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/adc.html#overview)
+  measuredvbat *= 1.1;
 }
 
 void loop() 
@@ -300,6 +315,7 @@ void logValues()
   Serial.print("CO2 equiv = "); Serial.print(iaqSensor.co2Equivalent); Serial.println("");
   Serial.print("Breath VOC = "); Serial.print(iaqSensor.breathVocEquivalent); Serial.println("");
   Serial.print(F("Wifi strength: "));Serial.println(WiFi.RSSI());
+  Serial.print("VBat: " ); Serial.println(measuredvbat);
   
 }
 
@@ -314,6 +330,7 @@ void updateLcd()
   display.print("IAQ Accur: "); display.println(iaqSensor.iaqAccuracy);
   display.print("VOC: "); display.println(iaqSensor.breathVocEquivalent);
   display.print("Wifi strength: ");display.println(WiFi.RSSI());
+  display.print("VBat: " ); display.println(measuredvbat);
   display.display();
 #endif
 }
